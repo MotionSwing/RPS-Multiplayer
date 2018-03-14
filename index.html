@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>RPS Multiplayer Game</title>
+
+	<!-- Stylesheets -->
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+	<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+	<!-- Jumbotron -->
+
+	<div class="container">
+		<div class="jumbotron text-center">
+		  <h1 class="display-4">Rock Paper Scissors</h1>
+		  <p class="lead">Challenge a friend, if you dare...</p>
+		</div>
+		<!-- Player Name Submission form -->
+		<div id="playerAndStatusInfo" class="row justify-content-md-center">
+			<form class="form-inline">
+			  <div class="form-group mx-sm-3 mb-2">
+			    <input type="text" class="form-control" id="inputName" placeholder="Name">
+			  </div>
+			  <button id="submitName" type="submit" class="btn btn-primary mb-2">Start</button>
+			</form>		
+		</div>
+
+		<!-- Center Row (Contains player details and button options) -->
+		<div class="row mt-4 justify-content-md-center">
+			<div class="card player-1 m-2" style="width: 18rem;">
+			  <div class="card-header">
+			  	<h5 class="card-title player-name text-center">Waiting for Player 1</h5>
+			  </div>
+			  <div id="p1-info" class="card-body text-center hide">
+			    <div class="btn btn-primary rock" data-player="1">Rock</div>
+			    <div class="btn btn-primary paper" data-player="1">Paper</div>
+			    <div class="btn btn-primary scissors" data-player="1">Scissors</div>
+			    <p class="card-text text-center wins-losses" data-player="1">Wins 0 Losses 0</p>
+			  </div>
+			</div>
+			<div class="card m-2" style="width: 18rem;">
+			  <div class="card-body">
+			    <h5 id="winner" class="card-title text-center">Game Status</h5>
+			  </div>
+			</div>
+			<div class="card player-2 m-2" style="width: 18rem;">
+			  <div class="card-header">
+			  	<h5 class="card-title player-name text-center">Waiting for Player 2</h5>
+			  </div>
+			  <div id="p2-info" class="card-body text-center hide">
+			    <div class="btn btn-primary rock" data-player="2">Rock</div>
+			    <div class="btn btn-primary paper" data-player="2">Paper</div>
+			    <div class="btn btn-primary scissors" data-player="2">Scissors</div>
+			    <p class="card-text text-center wins-losses" data-player="2">Wins 0 Losses 0</p>
+			  </div>
+			</div>		
+		</div>
+
+		<!-- Chat Box -->
+		<div class="row mt-4">
+			<form class="col-12">
+			  <div id="chatHistory"></div>
+			  <div class="row form-group justify-content-md-center">
+			    <input id="chatInput" type="text" class="form-control col-11 mr-2" />
+			    <input id="chatSendBtn" type="submit" class="btn btn-primary" value="Send" />
+			  </div>
+			</form>
+		</div>		
+	</div>
+
+	<!-- CDNs -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.21.0/moment.min.js"></script>
+
+	<!-- Firebase -->
+	<script src="https://www.gstatic.com/firebasejs/4.11.0/firebase.js"></script>
+
+	<!-- Custom Script -->
+	<script src="assets/javascript/app.js"></script>
+</body>
+</html>

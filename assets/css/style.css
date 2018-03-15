@@ -2,14 +2,25 @@
 	visibility: hidden;
 }
 
+/* Custom Bootstrap */
+
 .jumbotron {
 	padding: .25rem;
 }
+
+.border-warning {
+    border-width: 2px !important;
+}
+
+/* Extra */
 
 #playerAndStatusInfo p {
 	display: block;
 }
 
+/*------*/
+/* Chat */
+/*------*/
 #chatHistory {
     display: block;
     width: 100%;
@@ -33,23 +44,28 @@
 
 .comment {
 	display: flex;
+	position: relative;
 }
 
 .commentText {
 	width: 90%;
 }
 
-.commentDateTime {
-	display: flex;
-	flex-flow: column nowrap;
-}
-
-.commentDate {
+.commentTime {
     font-size: .675rem;
     font-weight: 700;
+    position: absolute;
+    right: 0;
 }
 
-.commentTime {
-	font-size: .675rem;
-	text-align: center;
+.comment.player-1 {
+    color: #06f;
+}
+
+.comment.player-2 {
+    color: #ff241e;
+}
+
+.playerName {
+    font-weight: 600;
 }

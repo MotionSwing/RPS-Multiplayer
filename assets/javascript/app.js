@@ -11,32 +11,87 @@ firebase.initializeApp(config);
 
 var database = firebase.database();
 
-firebase.auth().signInAnonymously().catch(function(error) {
-  // Handle Errors here.
-  var errorCode = error.code;
-  var errorMessage = error.message;
-  // ...
+// Detect when users come and go
+var connectionsRef = database.ref("/connections");
+var connectedRef = database.ref(".info/connected");
+
+connectedRef.on('value', function(snap) {
+	if(snap.val()){
+		var con = connectionsRef.push("connected");
+
+		con.onDisconnect().remove();
+		// con.onDisconnect().set("disconnected");
+	}
 });
 
+// Change in the number of connections +/-
+connectionsRef.on('value', function(snap) {
+	console.log(snap.numChildren());
+});
+
+// ==============================
+// ======= CHAT =================
+// ==============================
+$("#chatSendBtn").on('click', function(event) {
+	event.preventDefault();
+
+	// Get comment and push to the database
+	const chatComment = $("#chatInput").val().trim();
+	if(chatComment.length > 0){
+		$("#chatInput").val('');
+		database.ref("chat").push({
+			player: player.name,
+			comment: chatComment,
+			commentTime: firebase.database.ServerValue.TIMESTAMP
+		});
+	}
+});
+
+database.ref("chat").orderByChild("commentDate").limitToLast(10).on('child_added', function(childSnapshot) {
+	console.log('chat add comment');
+	const comment = $("<div class='comment'>");
+	const commentText = $("<p class='commentText'>")
+		.text(childSnapshot.val().player + ": " + childSnapshot.val().comment);
+
+	const commentTime = $("<div class='commentTime'>")
+		.text(moment(childSnapshot.val().commentTime).format("h:mm a"));
+
+	comment.append(commentText,commentTime);
+
+	$("#chatHistory").append(comment);
+});
+
+// setup player object
+// This holds the current user's info
 var player = {
 	num: 0,
-	name: null,
+	name: "",
 	wins: 0,
 	losses: 0,
-	choice: null
+	choice: ""
 };
 
+// Global variables
 var playerOneIsChosen = false;
 var playerTwoIsChosen = false;
 var playerOne;
 var playerTwo;
 var currentTurn = 0;
 
+// Sign in users anonymously
+firebase.auth().signInAnonymously().catch(function(error) {
+	// Handle Errors here.
+	var errorCode = error.code;
+	var errorMessage = error.message;
+ 	console.log("Error: " + errorCode + " | " + errorMessage);
+});
+
 firebase.auth().onAuthStateChanged(function(user) {
   if (user) {
     // User is signed in.
     var isAnonymous = user.isAnonymous;
     var uid = user.uid;
+    console.log(uid);
 
 	// initial load and subsequent value changes
 	database.ref().on('value', function(snapshot) {
@@ -50,12 +105,6 @@ firebase.auth().onAuthStateChanged(function(user) {
 			const wins = snapshot.child("players/1").val().wins;
 			$(".player-1 .player-name").text(name);
 			$(".player-1 .wins-losses").text("Wins " + wins + " Losses " + losses);
-
-			database.ref("players/" + player.num).onDisconnect().remove(function(){
-				console.log('Player ' + player.num + " logged off");
-				database.ref("players/turn").remove();
-				showNameInput();
-			});
 		}else {
 			$(".player-1 .player-name").text("Waiting for Player 1");
 			playerOneIsChosen = false;
@@ -71,12 +120,6 @@ firebase.auth().onAuthStateChanged(function(user) {
 			$(".player-2 .player-name").text(name);
 			$(".player-2 .wins-losses").text("Wins " + wins + " Losses " + losses);
 			$("#p"+ player.num +"-info").removeClass('hide');
-
-			database.ref("players/" + player.num).onDisconnect().remove(function(){
-				console.log('Player ' + player.num + " logged off");
-				database.ref("players/turn").remove();
-				showNameInput();
-			});
 
 		}else {
 			$(".player-2 .player-name").text("Waiting for Player 2");
@@ -151,25 +194,42 @@ firebase.auth().onAuthStateChanged(function(user) {
 		};
 	});
 
-	// ==============================
-	// ======= CHAT =================
-	// ==============================
-	database.ref("chat").on('child_added', function(snapshot) {
-		var comment = $("<div class='comment'>");
-		var commentText = $("<p class='commentText'>").text(snapshot.val().player + ": " + snapshot.val().comment);
-		var commentDateTime = $("<div class='commentDateTime'>");
-		var commentDate = $("<div class='commentDate'>").text(moment(snapshot.val().commentDate).format("MMM DD YYYY"));
-		var commentTime = $("<div class='commentTime'>").text(moment(snapshot.val().commentDate).format("HH:mm:ss"));
-		commentDateTime.append(commentDate, commentTime);
-		comment.append(commentText,commentDateTime);
+	// // ==============================
+	// // ======= CHAT =================
+	// // ==============================
+	// $("#chatSendBtn").on('click', function(event) {
+	// 	event.preventDefault();
 
-		$("#chatHistory").append(comment);
-	});
+	// 	// Get comment and push to the database
+	// 	const chatComment = $("#chatInput").val().trim();
+	// 	if(chatComment.length > 0){
+	// 		$("#chatInput").val('');
+	// 		database.ref("chat").push({
+	// 			player: player.name,
+	// 			comment: chatComment,
+	// 			commentTime: firebase.database.ServerValue.TIMESTAMP
+	// 		});
+	// 	}
+	// });
 
+	// database.ref("chat").orderByChild("commentDate").limitToLast(10).on('child_added', function(childSnapshot) {
+	// 	console.log('chat add comment');
+	// 	const comment = $("<div class='comment'>");
+	// 	const commentText = $("<p class='commentText'>")
+	// 		.text(childSnapshot.val().player + ": " + childSnapshot.val().comment);
+
+	// 	const commentTime = $("<div class='commentTime'>")
+	// 		.text(moment(childSnapshot.val().commentTime).format("h:mm a"));
+
+	// 	comment.append(commentText,commentTime);
+
+	// 	$("#chatHistory").append(comment);
+	// });
 
 	// Set the name(s) of the players
 	$("#submitName").on('click', function(event) {
 		event.preventDefault();
+		$("#chatHistory").empty();
 		if(!playerOneIsChosen){
 			player.name = $("#inputName").val().trim();
 			player.num = 1;
@@ -209,20 +269,7 @@ firebase.auth().onAuthStateChanged(function(user) {
 		$(".rock, .paper").hide();
 	});
 
-	$("#chatSendBtn").on('click', function(event) {
-		event.preventDefault();
 
-		// Get comment and push to the database
-		var chatComment = $("#chatInput").val().trim();
-		if(chatComment.length > 0){
-			$("#chatInput").val('');
-			database.ref("chat").push({
-				player: player.name,
-				comment: chatComment,
-				commentDate: firebase.database.ServerValue.TIMESTAMP
-			});
-		}
-	});
 
 	function updatePlayerChoice(selectedOption){
 		currentTurn++;
@@ -237,6 +284,7 @@ firebase.auth().onAuthStateChanged(function(user) {
   } else {
     // User is signed out.
     // ...
+    console.log('user sign out');
   }
 });
 
@@ -279,14 +327,14 @@ function displayWhosTurn(turnNum) {
 	if(turnNum === 1){
 		if(player.num === 1){
 			turnStatus.text("It's Your Turn!");
-		}else {
+		}else if(player.num === 2)  {
 			turnStatus.text("Waiting on " + playerOne + " to choose");
 		}
 		$("#playerAndStatusInfo").append(turnStatus);
 	}else if(turnNum === 2){
 		if(player.num === 1){
 			turnStatus.text("Waiting on " + playerTwo + " to choose");
-		}else {
+		}else if(player.num === 2) {
 			turnStatus.text("It's Your Turn!");
 		}
 		$("#playerAndStatusInfo").append(turnStatus);

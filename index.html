@@ -8,51 +8,63 @@
 	<link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-
-	<!-- Jumbotron -->
-
 	<div class="container">
+
+		<!-- Jumbotron -->
 		<div class="jumbotron text-center">
 		  <h1 class="display-4">Rock Paper Scissors</h1>
 		  <p class="lead">Challenge a friend, if you dare...</p>
 		</div>
-		<!-- Player Name Submission form -->
-		<div id="playerAndStatusInfo" class="row justify-content-md-center">
-			<form class="form-inline">
+
+
+		<div id="status" class="row justify-content-md-center">
+			<!-- Player Name Submission form -->
+			<form id="joinForm" class="form-inline">
 			  <div class="form-group mx-sm-3 mb-2">
-			    <input type="text" class="form-control" id="inputName" placeholder="Name">
+			    <input id="inputName" type="text" class="form-control" placeholder="Name">
 			  </div>
 			  <button id="submitName" type="submit" class="btn btn-primary mb-2">Start</button>
-			</form>		
+			</form>	
+
+			<!-- Player Info & Turn Status -->
+			<div id="playerTurn">
+				<div id="playerInfo">
+					<p class='text-center'>Hi [Player Name]! You are Player [Player Num]</p>
+				</div>
+				<div id="turnStatus">
+					<p class='text-center'>It's Your Turn! | Waiting for [Player Name] to chose.</p>
+				</div>
+			</div>
+
 		</div>
 
 		<!-- Center Row (Contains player details and button options) -->
 		<div class="row mt-4 justify-content-md-center">
-			<div class="card player-1 m-2" style="width: 18rem;">
+			<div id="player-1" class="card player m-2" style="width: 18rem;">
 			  <div class="card-header">
 			  	<h5 class="card-title player-name text-center">Waiting for Player 1</h5>
 			  </div>
 			  <div id="p1-info" class="card-body text-center hide">
-			    <div class="btn btn-primary rock" data-player="1">Rock</div>
-			    <div class="btn btn-primary paper" data-player="1">Paper</div>
-			    <div class="btn btn-primary scissors" data-player="1">Scissors</div>
-			    <p class="card-text text-center wins-losses" data-player="1">Wins 0 Losses 0</p>
+			    <div class="btn btn-primary rock">Rock</div>
+			    <div class="btn btn-primary paper">Paper</div>
+			    <div class="btn btn-primary scissors">Scissors</div>
+			    <p class="card-text text-center">Wins <span class="wins">0</span> Losses <span class="losses">0</span></p>
 			  </div>
 			</div>
 			<div class="card m-2" style="width: 18rem;">
 			  <div class="card-body">
-			    <h5 id="winner" class="card-title text-center">Game Status</h5>
+			    <h5 id="results" class="card-title text-center">Game Status</h5>
 			  </div>
 			</div>
-			<div class="card player-2 m-2" style="width: 18rem;">
+			<div id="player-2" class="card player m-2" style="width: 18rem;">
 			  <div class="card-header">
 			  	<h5 class="card-title player-name text-center">Waiting for Player 2</h5>
 			  </div>
 			  <div id="p2-info" class="card-body text-center hide">
-			    <div class="btn btn-primary rock" data-player="2">Rock</div>
-			    <div class="btn btn-primary paper" data-player="2">Paper</div>
-			    <div class="btn btn-primary scissors" data-player="2">Scissors</div>
-			    <p class="card-text text-center wins-losses" data-player="2">Wins 0 Losses 0</p>
+			    <div class="btn btn-primary rock">Rock</div>
+			    <div class="btn btn-primary paper">Paper</div>
+			    <div class="btn btn-primary scissors">Scissors</div>
+			    <p class="card-text text-center">Wins <span class="wins">0</span> Losses <span class="losses">0</span></p>
 			  </div>
 			</div>		
 		</div>
@@ -79,6 +91,6 @@
 	<script src="https://www.gstatic.com/firebasejs/4.11.0/firebase.js"></script>
 
 	<!-- Custom Script -->
-	<script src="assets/javascript/app.js"></script>
+	<script src="assets/javascript/app2.js"></script>
 </body>
 </html>

@@ -1,5 +1,4 @@
-game.displayPlayerTurn("hide");
-game.updateTurnStatus("hide","","","");
+
 
 // ==============================
 // ======= Initialize App =======
@@ -19,34 +18,24 @@ var database = firebase.database();
 // ==============================
 // ===== Detect Connections =====
 // ==============================
-// var connectionsRef = database.ref("/connections");
-// var connectedRef = database.ref(".info/connected");
+var connectionsRef = database.ref("/connections");
+var connectedRef = database.ref(".info/connected");
 
-// connectedRef.on('value', function(snap) {
-// 	if(snap.val()){
-// 		var con = connectionsRef.push("connected");
-// 		con.onDisconnect().remove();
-// 	}
-// });
+connectedRef.on('value', function(snap) {
+	if(snap.val()){
+		var con = connectionsRef.push("connected");
+		con.onDisconnect().remove();
+	}
+});
 
 // Change in the number of connections +/-
-// connectionsRef.on('value', function(snap) {
-// 	console.log(snap.numChildren() + " participant(s)");
-// });
+connectionsRef.on('value', function(snap) {
+	$(".visitors").text(snap.numChildren() + " visitors");
+});
 
-// setTimeout(function(){
-// 	database.ref("players/1").remove();
-// }, 10000);
 // ============================
 // ===== Global Variables =====
 // ============================
-
-// TODO: Add game object here; insert player object inside game object
-// 		 add all functions (not touching DB) within the game object
-var player = {
-	num: 0,
-	name: ""
-}
 
 var playerOneExists = false;
 var playerTwoExists = false;
@@ -59,13 +48,13 @@ $("#chatSendBtn").on('click', function(event) {
 
 	// Get comment and push to the database
 	// Only if the comment is from a recognized player
-	if (player.num > 0) {
+	if (game.player.num > 0) {
 		const chatComment = $("#chatInput").val().trim();
 		if(chatComment.length > 0){
 			$("#chatInput").val('');
 			database.ref("chat").push({
-				playerNum: player.num,
-				playerName: player.name,  //TODO: make sure we're still using player.name
+				playerNum: game.player.num,
+				playerName: game.player.name,
 				comment: chatComment,
 				commentTime: firebase.database.ServerValue.TIMESTAMP
 			});
@@ -102,6 +91,7 @@ database.ref("chat").orderByChild("commentDate").limitToLast(10).on('child_added
 	}
 });
 
+
 // =============================
 // ===== Firebase Control ======
 // =============================
@@ -123,24 +113,33 @@ firebase.auth().onAuthStateChanged(function(user) {
 			event.preventDefault();
 			// Send name to DB
 			const username = $("#inputName").val().trim();
-			player.name = username;
+			game.player.name = username;
 
 			if(!playerOneExists){
-				player.num = 1;
+				game.player.num = 1;
 				database.ref("players/1").set({
 					losses: 0,
 					name: username,
 					wins: 0
 				});
-				game.updateNameTags();
+				// hide form and display other things
+				$("#joinForm").css('display', 'none');
+				$("#playerInfo").text("Hi " + username + "! You are Player " + game.player.num);
+				game.hasStarted = true;
+
+				// game.updateNameTags(); --Remove
 			}else if(playerOneExists && !playerTwoExists){
-				player.num = 2;
+				game.player.num = 2;
 				database.ref("players/2").set({
 					losses: 0,
 					name: username,
 					wins: 0
 				});
-				game.updateNameTags();
+
+				$("#joinForm").css('display', 'none');
+				$("#playerInfo").text("Hi " + username + "! You are Player " + game.player.num);
+				game.hasStarted = true;
+				// game.updateNameTags();  --Remove
 			}
 			$("#inputName").val('');
 		});
@@ -175,34 +174,76 @@ firebase.auth().onAuthStateChanged(function(user) {
 				database.ref().update({
 					turn: game.turn
 				});
+				// Display Turn Info
+				if(game.player.num === game.turn) {
+					$("#turnInfo").text("It's Your Turn!");
+				}else{
+					$("#turnInfo").text("Waiting for " + snapshot.child("players/1").val().name + " to choose.");
+				}
 			}else if(!snapshot.child("players/1").exists() || !snapshot.child("players/2").exists()){
 				// If a player doesn't exist, reset the turn to 0
 				game.turn = 0;
 				database.ref().update({
 					turn: game.turn
 				});
+				$("#turnInfo").text('');
+				$("#p1-info").addClass('hide');
+				$("#p2-info").addClass('hide');	
 			}
 
-			// Check if both player 1 & player 2 exist
-			if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.turn < 3){
-				game.readyPlayer(snapshot);
-			}else {
-				game.highlightPlayer(0);
+			if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.turn === 1){
+				// reveal Player 1's options only on player 1's screen -- Hide all others
+				if(game.player.num === game.turn){
+					$("#turnInfo").text("It's Your Turn!");
+					$("#player-1 .btn").show();
+					$("#p1-info").removeClass('hide');
+					$("#p2-info").addClass('hide');	
+				}else {
+					$("#turnInfo").text("Waiting for " + snapshot.child("players/1").val().name + " to choose.");
+					$("#p1-info").addClass('hide');
+					$("#p2-info").addClass('hide');	
+				}
 			}
 
-			// if(snapshot.child("players/1/choice").exists() && game.turn === 2){
-			// 	$("#p1-info").addClass('hide');
+			if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.turn === 2){
+				if(game.player.num === game.turn) {
+					$("#turnInfo").text("It's Your Turn!");
+					$("#player-2 .btn").show();
+					$("#p1-info").addClass('hide');
+					$("#p2-info").removeClass('hide');	
+				}else {
+					$("#turnInfo").text("Waiting for " + snapshot.child("players/2").val().name + " to choose.");
+					$("#p1-info").removeClass('hide');
+
+					var choice = $("#player-1 .btn.active").attr('data-value');
+					$("#player-1 .btn:not(."+ choice +")").hide();
+					$("#p2-info").addClass('hide');
+				}
+			}
+
+			if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.roundFinished){
+				$("#p1-info").removeClass('hide');
+				$("#p2-info").removeClass('hide');	
+
+				var choice = $("#player-2 .btn.active").attr('data-value');
+				$("#player-2 .btn:not(."+ choice +")").hide();
+			}
+
+
+
+			// // Check if both player 1 & player 2 exist
+			// if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.turn < 3){
+			// 	game.readyPlayer(snapshot);
+			// }else {
+			// 	game.highlightPlayer(0);
 			// }
 
-			// Check who won the game
-			if(snapshot.child("turn").val() === 3 && 
+			// Check to see who won the game
+			if(snapshot.child("turn").val() === 3 && game.roundFinished === false && 
 				snapshot.child("players/1/choice").exists() && 
 				snapshot.child("players/2/choice").exists()){
 
-				console.log("Check Winner: reset turn back to 1");
-				database.ref().update({
-					turn: 1
-				});
+				game.roundFinished = true;
 
 				console.log("Check Winner: obtain player choices");
 				var p1_choice = snapshot.child("players/1/choice").val();
@@ -254,14 +295,30 @@ firebase.auth().onAuthStateChanged(function(user) {
 					game.turn = snapshot.val();
 				});
 			}
+
+			// Ensure client-side Player 1 name is in sync with DB
+			if(snapshot.child("players/1/name").exists()){
+				database.ref("turn").on('value', function(snapshot) {
+					var username = snapshot.val();
+					game.player.name = username;
+				});
+			}
+
+			// Ensure client-side Player 2 name is in sync with DB
+			if(snapshot.child("players/2/name").exists()){
+				database.ref("turn").on('value', function(snapshot) {
+					var username = snapshot.val();
+					game.player.name = username;
+				});
+			}
 		
 		});	
 		// End database.ref().on('value')
 		
 		database.ref().on('child_removed', function(snapshot) {
 			// console.log('a child has been removed');
-			game.displayJoinForm("show");
-			game.displayPlayerTurn("hide");
+			// game.displayJoinForm("show");
+			// game.displayPlayerTurn("hide");
 		});
 
 		// -------------------------------
@@ -308,15 +365,22 @@ var game = {
     turn: 0,
     hasStarted: false,
     hasSelectedChoice: false,
+    roundFinished: false,
     roundReset: 5000,
     p1_comment_sound: new Audio('assets/audio/button-09.mp3'),
     p2_comment_sound: new Audio('assets/audio/button-11.mp3'),
+    player: {
+    	num: 0,
+    	name: "",
+    	choice: ""
+    },
 
     // Hide the name input form & display the player's name and assigned number
     updateNameTags: function(){
     	const username = $("#inputName").val().trim();
-		game.displayJoinForm("hide");
-		game.displayPlayerTurn("show", player.num, username);
+		// game.displayJoinForm("hide");
+		// game.displayPlayerTurn("show", game.player.num, username);
+    	game.hasStarted = true;
     },
 
     // Hide/Show name input form
@@ -331,53 +395,52 @@ var game = {
     // Display the player's name and player number
     displayPlayerTurn: function(display, playerNum, playerName){
     	if(display === "show"){
-			$("#playerTurn").css('display', 'block');
-			$("#playerInfo p").text("Hi " + playerName + "! You are Player " + playerNum);
+			// $("#playerTurn").css('display', 'block');
+			$("#playerInfo").text("Hi " + playerName + "! You are Player " + playerNum);
 		}else if(display === "hide"){
-			$("#playerTurn").css('display', 'none');
+			// $("#playerTurn").css('display', 'none');
 		}
     },
 
 	// * update the 'status' to notify the user if it is their turn or 
 	//   if they are waiting for the other player to move
-    updateTurnStatus: function(display, playerNum, activePlayerNum, activePlayerName) {
+    updateTurnInfo: function(display, playerNum, activePlayerNum, activePlayerName) {
     	if(display === "show"){
-			$("#turnStatus").css('display', 'block');
+			// $("#turnInfo").css('display', 'block');
 
 			if(playerNum === activePlayerNum) {
-				$("#turnStatus p").text("It's Your Turn!");
-				game.displayOptions("show", playerNum);
-				// displayOptions("hide", (playerNum === 1) ? 2 : 1);
+				$("#turnInfo").text("It's Your Turn!");
+				// game.displayOptions("show", playerNum);
 			}else{
-				$("#turnStatus p").text("Waiting for " + activePlayerName + " to choose.");
-				$("#p"+ activePlayerNum +"-info").addClass('hide');
-				game.displayOptions("hide", playerNum);
+				$("#turnInfo").text("Waiting for " + activePlayerName + " to choose.");
+				// $("#p"+ activePlayerNum +"-info").addClass('hide');
+				// game.displayOptions("hide", playerNum);
 			}
 
 		}else if (display === "hide"){
-			$("#turnStatus").css('display', 'none');
+			// $("#turnInfo").css('display', 'none');
 		}
     },
 
     // Displays all Options for the
     displayOptions: function(display, playerNum){
     	if(display === "show"){
-			$("#p"+ playerNum +"-info").removeClass('hide');
-			$("#p"+ (playerNum === 1) ? 2 : 1 +"-info").addClass('hide'); //TODO: this may be hiding the buttons unexpectently 
-			$(".rock, .paper, .scissors").show();
+			// $("#p"+ playerNum +"-info").removeClass('hide');
+			// $("#p"+ (playerNum === 1) ? 2 : 1 +"-info").addClass('hide'); //TODO: this may be hiding the buttons unexpectently 
+			// $(".rock, .paper, .scissors").show();
 		}else {
-			$("#p"+ playerNum +"-info").addClass('hide');
-			$("#p"+ (playerNum === 1) ? 2 : 1 +"-info").removeClass('hide');
-			$(".rock, .paper, .scissors").hide();
+			// $("#p"+ playerNum +"-info").addClass('hide'); //TODO: remove??
+			// $("#p"+ (playerNum === 1) ? 2 : 1 +"-info").removeClass('hide');
+			// $(".rock, .paper, .scissors").hide();
 		}
     },
 
     // Reveals the chosen responses to both players (after a winner has been chosen)
     reveal: function(display){
     	if(display === "show"){
-			$("#p1-info, #p2-info").removeClass('hide');
+			// $("#p1-info, #p2-info").removeClass('hide');
 		}else {
-			$("#p1-info, #p2-info").addClass('hide');
+			// $("#p1-info, #p2-info").addClass('hide');
 		}
     },
 
@@ -393,10 +456,12 @@ var game = {
 
 		game.hasSelectedChoice = true;
 
+		game.player.choice = selectedOption;
+
 		database.ref().update({
 			turn: game.turn
 		});
-		database.ref("players/" + player.num).update({
+		database.ref("players/" + game.player.num).update({
 			choice: selectedOption
 		});
     },
@@ -421,42 +486,48 @@ var game = {
 			console.log('Check Winner: Tie Game');
 			$("#results").text("Tie Game!");	
 		}
-		game.reveal("show");
+		// game.reveal("show");
     },
 
-
+    // Resets the game
     resetGame: function(snap){
     	game.hasSelectedChoice = false;
 		$("#results").text('');
-		// $(".rock, .paper, .scissors").show();
-		game.readyPlayer(snap);
-		game.displayOptions("show", player.num);
-		game.displayOptions("hide", (player.num === 1) ? 2 : 1);
-
+		game.roundFinished = false;
+		database.ref().update({
+			turn: 1
+		});
+		$("#player-1 .btn").removeClass('active');
+		$("#player-2 .btn").removeClass('active');
+  //   	game.displayPlayerTurn("hide");
+		// game.updateTurnInfo("hide","","","");
+		// game.readyPlayer(snap);
+		// game.displayOptions("show", game.player.num);
+		// $("#p2-info").addClass('hide');
 		console.log('game has been reset');
     },
 
-
     readyPlayer: function(snap){
-    	game.updateTurnStatus("show",player.num,game.turn,snap.child("players/" + game.turn).val().name);
-		game.highlightPlayer(game.turn);
+  //   	game.updateTurnInfo("show",game.player.num,game.turn,snap.child("players/" + game.turn).val().name);
+		// game.highlightPlayer(game.turn);
     }
 }
 
-// ============================
-// ======= DOM Control ========
-// ============================
+// game.displayPlayerTurn("hide");
+// game.updateTurnInfo("hide","","","");
 
-// ------------
-// Event Handlers
-// ------------
+// ===========================
+// ===== Event Handlers ======
+// ===========================
 
 $(".player .btn").on('click', function(event) {
 	event.preventDefault();
 	if(!game.hasSelectedChoice){
 		var choice = $(this).attr('data-value');
+		$(".player .btn").removeClass('active');
+		$(this).addClass('active');
 		game.updatePlayerChoice(choice);
-		$(".player .btn:not(."+ choice +")").hide();
+		// $("#player-"+ game.player.num +" .btn:not(."+ choice +")").hide();
 	}
 });
 
@@ -464,13 +535,6 @@ $(".reset").on('click', function(event) {
 	event.preventDefault();
 	database.ref().remove();
 	$("#chatHistory").empty();
-	game.displayJoinForm("show");
-	game.displayPlayerTurn("hide");
-	// $("#p2-info").addClass('hide');
+	// game.displayJoinForm("show");
+	// game.displayPlayerTurn("hide");
 });
-
-// ------------
-// TODO
-// -----------
-
-// * Hide options once choice has been made & display chosen option / change state to prevent further clicking

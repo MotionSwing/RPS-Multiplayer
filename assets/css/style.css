@@ -74,8 +74,16 @@
     left: 10px;
 }
 
-/* Options */
+/* Misc */
 #p1-info,
 #p2-info {
     min-height: 78px;
+}
+
+.visitors {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    color: #fff;
+    font-weight: 600;
 }

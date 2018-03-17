@@ -1,8 +1,6 @@
-
-
-// ==============================
-// ======= Initialize App =======
-// ==============================
+// =============================
+// ==== Initialize Firebase ====
+// =============================
 var config = {
 	apiKey: "AIzaSyDJF2XlesilxEfKHgF_1I3CL7MZbcaAjYo",
 	authDomain: "rps-game-6259d.firebaseapp.com",
@@ -15,24 +13,6 @@ firebase.initializeApp(config);
 
 var database = firebase.database();
 
-// ==============================
-// ===== Detect Connections =====
-// ==============================
-var connectionsRef = database.ref("/connections");
-var connectedRef = database.ref(".info/connected");
-
-connectedRef.on('value', function(snap) {
-	if(snap.val()){
-		var con = connectionsRef.push("connected");
-		con.onDisconnect().remove();
-	}
-});
-
-// Change in the number of connections +/-
-connectionsRef.on('value', function(snap) {
-	$(".visitors").text(snap.numChildren() + " visitors");
-});
-
 // ============================
 // ===== Global Variables =====
 // ============================
@@ -40,61 +20,100 @@ connectionsRef.on('value', function(snap) {
 var playerOneExists = false;
 var playerTwoExists = false;
 
-// ============================
-// ======= Player Chat ========
-// ============================
-$("#chatSendBtn").on('click', function(event) {
-	event.preventDefault();
+// ------------
+// Game Object
+// ------------
+var game = {
+    turn: 0,
+    hasStarted: false,
+    hasSelectedChoice: false,
+    roundFinished: false,
+    roundReset: 5000,
+    p1_comment_sound: new Audio('assets/audio/button-09.mp3'),
+    p2_comment_sound: new Audio('assets/audio/button-11.mp3'),
+    player: {
+    	num: 0,
+    	name: "",
+    	choice: ""
+    },
 
-	// Get comment and push to the database
-	// Only if the comment is from a recognized player
-	if (game.player.num > 0) {
-		const chatComment = $("#chatInput").val().trim();
-		if(chatComment.length > 0){
-			$("#chatInput").val('');
-			database.ref("chat").push({
-				playerNum: game.player.num,
-				playerName: game.player.name,
-				comment: chatComment,
-				commentTime: firebase.database.ServerValue.TIMESTAMP
+	// Update database to reflect player's choice for this round
+    updatePlayerChoice: function(selectedOption){
+    	(game.turn === 1) ? game.turn = 2 : game.turn = 3;
+
+		game.hasSelectedChoice = true;
+
+		game.player.choice = selectedOption;
+
+		database.ref().update({
+			turn: game.turn
+		});
+		database.ref("players/" + game.player.num).update({
+			choice: selectedOption
+		});
+    },
+
+    // Increment wins/losses and update the DOM with the winner
+    displayWinner: function(snap, winner,loser){
+    	if(!(winner === 0) && !(loser === 0)){
+			console.log('Check Winner: Player '+ winner +' wins!');
+			let winner_wins = snap.child("players/" + winner).val().wins;
+			let loser_losses = snap.child("players/" + loser).val().losses;
+			winner_wins++;
+			loser_losses++;
+			database.ref("players/" + winner).update({
+				wins: winner_wins
 			});
-		}		
+			database.ref("players/" + loser).update({
+				losses: loser_losses
+			});
+
+			$("#results").text(snap.child("players/" + winner).val().name + " Wins!!");		
+		}else{
+			console.log('Check Winner: Tie Game');
+			$("#results").text("Tie Game!");	
+		}
+    },
+
+    // Resets the game
+    resetGame: function(snap){
+    	game.hasSelectedChoice = false;
+		$("#results").text('');
+		game.roundFinished = false;
+		database.ref().update({
+			turn: 1
+		});
+		$("#player-1 .btn, #player-2 .btn").removeClass('active').show();
+		$("#p2-info").addClass('hide');
+		console.log('game has been reset');
+		$(".player").removeClass('bg-warning');
+		$("#player-1").addClass('bg-warning');
+    }
+}
+
+// ===========================
+// ===== Event Handlers ======
+// ===========================
+
+$(".player .btn").on('click', function(event) {
+	event.preventDefault();
+	if(!game.hasSelectedChoice){
+		var choice = $(this).attr('data-value');
+		$("#player-"+ game.player.num +" .btn").removeClass('active');
+		$(this).addClass('active');
+		game.updatePlayerChoice(choice);
 	}
 });
 
-database.ref("chat").orderByChild("commentDate").limitToLast(10).on('child_added', function(childSnapshot) {
-	const comment = $("<div class='comment player-"+ childSnapshot.val().playerNum +"'>");
-	const commentText = $("<p class='commentText'>")
-		.html("<span class='playerName'>"+childSnapshot.val().playerName + ":</span> " + childSnapshot.val().comment);
-
-	const commentTime = $("<div class='commentTime'>")
-		.text(moment(childSnapshot.val().commentTime).format("h:mm a"));
-
-	comment.append(commentText,commentTime);
-
-	$("#chatHistory").append(comment);
-
-	// Play sound
-	if(game.hasStarted && childSnapshot.val().playerNum === 1){
-		game.p1_comment_sound.play();
-	}else if(game.hasStarted && childSnapshot.val().playerNum === 2){
-		game.p2_comment_sound.play();
-	}
-
-	const chat = $("#chatHistory");
-	// chat.scrollTop(chat.prop("scrollHeight"));
-	chat.animate({ scrollTop: chat.prop("scrollHeight")}, 1000);
-
-	// Remove the top most comment;
-	if($("#chatHistory div").children().length > 10){
-		$("#chatHistory div").eq(0).remove();
-	}
+$(".reset").on('click', function(event) {
+	event.preventDefault();
+	database.ref().remove();
+	$("#chatHistory").empty();
 });
 
-
-// =============================
-// ===== Firebase Control ======
-// =============================
+// ================================
+// ===== User Authentication ======
+// ================================
 		
 // Log the user in anonymously
 firebase.auth().signInAnonymously();
@@ -126,8 +145,6 @@ firebase.auth().onAuthStateChanged(function(user) {
 				$("#joinForm").css('display', 'none');
 				$("#playerInfo").text("Hi " + username + "! You are Player " + game.player.num);
 				game.hasStarted = true;
-
-				// game.updateNameTags(); --Remove
 			}else if(playerOneExists && !playerTwoExists){
 				game.player.num = 2;
 				database.ref("players/2").set({
@@ -139,7 +156,6 @@ firebase.auth().onAuthStateChanged(function(user) {
 				$("#joinForm").css('display', 'none');
 				$("#playerInfo").text("Hi " + username + "! You are Player " + game.player.num);
 				game.hasStarted = true;
-				// game.updateNameTags();  --Remove
 			}
 			$("#inputName").val('');
 		});
@@ -191,28 +207,38 @@ firebase.auth().onAuthStateChanged(function(user) {
 				$("#p2-info").addClass('hide');	
 			}
 
+			// Player 1's turn
 			if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.turn === 1){
-				// reveal Player 1's options only on player 1's screen -- Hide all others
 				if(game.player.num === game.turn){
 					$("#turnInfo").text("It's Your Turn!");
+					$(".player").removeClass('bg-warning');
+					$("#player-" + game.turn).addClass('bg-warning');
 					$("#player-1 .btn").show();
 					$("#p1-info").removeClass('hide');
 					$("#p2-info").addClass('hide');	
 				}else {
 					$("#turnInfo").text("Waiting for " + snapshot.child("players/1").val().name + " to choose.");
+					$(".player").removeClass('bg-warning');
+					$("#player-" + game.turn).addClass('bg-warning');
 					$("#p1-info").addClass('hide');
 					$("#p2-info").addClass('hide');	
 				}
 			}
 
+			// Player 2's turn
 			if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.turn === 2){
 				if(game.player.num === game.turn) {
 					$("#turnInfo").text("It's Your Turn!");
+					$(".player").removeClass('bg-warning');
+					$("#player-" + game.turn).addClass('bg-warning');
 					$("#player-2 .btn").show();
 					$("#p1-info").addClass('hide');
-					$("#p2-info").removeClass('hide');	
+					$("#player-1 .btn[data-value="+ snapshot.child("players/1").val().choice +"]").addClass('active');
+					$("#p2-info").removeClass('hide');
 				}else {
 					$("#turnInfo").text("Waiting for " + snapshot.child("players/2").val().name + " to choose.");
+					$(".player").removeClass('bg-warning');
+					$("#player-" + game.turn).addClass('bg-warning');
 					$("#p1-info").removeClass('hide');
 
 					var choice = $("#player-1 .btn.active").attr('data-value');
@@ -221,22 +247,17 @@ firebase.auth().onAuthStateChanged(function(user) {
 				}
 			}
 
+			// Results Reveal
 			if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.roundFinished){
 				$("#p1-info").removeClass('hide');
 				$("#p2-info").removeClass('hide');	
 
-				var choice = $("#player-2 .btn.active").attr('data-value');
-				$("#player-2 .btn:not(."+ choice +")").hide();
+				var p1_choice = $("#player-1 .btn.active").attr('data-value');
+				$("#player-1 .btn:not(."+ p1_choice +")").hide();
+
+				var p2_choice = $("#player-2 .btn.active").attr('data-value');
+				$("#player-2 .btn:not(."+ p2_choice +")").hide();
 			}
-
-
-
-			// // Check if both player 1 & player 2 exist
-			// if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.turn < 3){
-			// 	game.readyPlayer(snapshot);
-			// }else {
-			// 	game.highlightPlayer(0);
-			// }
 
 			// Check to see who won the game
 			if(snapshot.child("turn").val() === 3 && game.roundFinished === false && 
@@ -313,13 +334,7 @@ firebase.auth().onAuthStateChanged(function(user) {
 			}
 		
 		});	
-		// End database.ref().on('value')
-		
-		database.ref().on('child_removed', function(snapshot) {
-			// console.log('a child has been removed');
-			// game.displayJoinForm("show");
-			// game.displayPlayerTurn("hide");
-		});
+		// End of database.ref().on('value')
 
 		// -------------------------------
 		// Console each player's choice
@@ -358,183 +373,70 @@ firebase.auth().onAuthStateChanged(function(user) {
 	}
 });
 
-// ------------
-// Game Object
-// ------------
-var game = {
-    turn: 0,
-    hasStarted: false,
-    hasSelectedChoice: false,
-    roundFinished: false,
-    roundReset: 5000,
-    p1_comment_sound: new Audio('assets/audio/button-09.mp3'),
-    p2_comment_sound: new Audio('assets/audio/button-11.mp3'),
-    player: {
-    	num: 0,
-    	name: "",
-    	choice: ""
-    },
-
-    // Hide the name input form & display the player's name and assigned number
-    updateNameTags: function(){
-    	const username = $("#inputName").val().trim();
-		// game.displayJoinForm("hide");
-		// game.displayPlayerTurn("show", game.player.num, username);
-    	game.hasStarted = true;
-    },
-
-    // Hide/Show name input form
-    displayJoinForm: function(display){
-	    if(display === "show"){
-			$("#joinForm").css('display', 'flex');
-		}else if(display === "hide"){
-			$("#joinForm").css('display', 'none');
-		}	
-    },
-
-    // Display the player's name and player number
-    displayPlayerTurn: function(display, playerNum, playerName){
-    	if(display === "show"){
-			// $("#playerTurn").css('display', 'block');
-			$("#playerInfo").text("Hi " + playerName + "! You are Player " + playerNum);
-		}else if(display === "hide"){
-			// $("#playerTurn").css('display', 'none');
-		}
-    },
-
-	// * update the 'status' to notify the user if it is their turn or 
-	//   if they are waiting for the other player to move
-    updateTurnInfo: function(display, playerNum, activePlayerNum, activePlayerName) {
-    	if(display === "show"){
-			// $("#turnInfo").css('display', 'block');
-
-			if(playerNum === activePlayerNum) {
-				$("#turnInfo").text("It's Your Turn!");
-				// game.displayOptions("show", playerNum);
-			}else{
-				$("#turnInfo").text("Waiting for " + activePlayerName + " to choose.");
-				// $("#p"+ activePlayerNum +"-info").addClass('hide');
-				// game.displayOptions("hide", playerNum);
-			}
-
-		}else if (display === "hide"){
-			// $("#turnInfo").css('display', 'none');
-		}
-    },
-
-    // Displays all Options for the
-    displayOptions: function(display, playerNum){
-    	if(display === "show"){
-			// $("#p"+ playerNum +"-info").removeClass('hide');
-			// $("#p"+ (playerNum === 1) ? 2 : 1 +"-info").addClass('hide'); //TODO: this may be hiding the buttons unexpectently 
-			// $(".rock, .paper, .scissors").show();
-		}else {
-			// $("#p"+ playerNum +"-info").addClass('hide'); //TODO: remove??
-			// $("#p"+ (playerNum === 1) ? 2 : 1 +"-info").removeClass('hide');
-			// $(".rock, .paper, .scissors").hide();
-		}
-    },
-
-    // Reveals the chosen responses to both players (after a winner has been chosen)
-    reveal: function(display){
-    	if(display === "show"){
-			// $("#p1-info, #p2-info").removeClass('hide');
-		}else {
-			// $("#p1-info, #p2-info").addClass('hide');
-		}
-    },
-
-    // Highlight the selected player
-    highlightPlayer: function(playerNum){
-    	$(".player").removeClass('bg-warning')
-		$("#player-" + playerNum).addClass('bg-warning');
-    },
-
-	// Update database to reflect player's choice for this round
-    updatePlayerChoice: function(selectedOption){
-    	(game.turn === 1) ? game.turn = 2 : game.turn = 3;
-
-		game.hasSelectedChoice = true;
-
-		game.player.choice = selectedOption;
-
-		database.ref().update({
-			turn: game.turn
-		});
-		database.ref("players/" + game.player.num).update({
-			choice: selectedOption
-		});
-    },
-
-    // Increment wins/losses and update the DOM with the winner
-    displayWinner: function(snap, winner,loser){
-    	if(!(winner === 0) && !(loser === 0)){
-			console.log('Check Winner: Player '+ winner +' wins!');
-			let winner_wins = snap.child("players/" + winner).val().wins;
-			let loser_losses = snap.child("players/" + loser).val().losses;
-			winner_wins++;
-			loser_losses++;
-			database.ref("players/" + winner).update({
-				wins: winner_wins
-			});
-			database.ref("players/" + loser).update({
-				losses: loser_losses
-			});
-
-			$("#results").text(snap.child("players/" + winner).val().name + " Wins!!");		
-		}else{
-			console.log('Check Winner: Tie Game');
-			$("#results").text("Tie Game!");	
-		}
-		// game.reveal("show");
-    },
-
-    // Resets the game
-    resetGame: function(snap){
-    	game.hasSelectedChoice = false;
-		$("#results").text('');
-		game.roundFinished = false;
-		database.ref().update({
-			turn: 1
-		});
-		$("#player-1 .btn").removeClass('active');
-		$("#player-2 .btn").removeClass('active');
-  //   	game.displayPlayerTurn("hide");
-		// game.updateTurnInfo("hide","","","");
-		// game.readyPlayer(snap);
-		// game.displayOptions("show", game.player.num);
-		// $("#p2-info").addClass('hide');
-		console.log('game has been reset');
-    },
-
-    readyPlayer: function(snap){
-  //   	game.updateTurnInfo("show",game.player.num,game.turn,snap.child("players/" + game.turn).val().name);
-		// game.highlightPlayer(game.turn);
-    }
-}
-
-// game.displayPlayerTurn("hide");
-// game.updateTurnInfo("hide","","","");
-
-// ===========================
-// ===== Event Handlers ======
-// ===========================
-
-$(".player .btn").on('click', function(event) {
+// ============================
+// ======= Player Chat ========
+// ============================
+$("#chatSendBtn").on('click', function(event) {
 	event.preventDefault();
-	if(!game.hasSelectedChoice){
-		var choice = $(this).attr('data-value');
-		$(".player .btn").removeClass('active');
-		$(this).addClass('active');
-		game.updatePlayerChoice(choice);
-		// $("#player-"+ game.player.num +" .btn:not(."+ choice +")").hide();
+
+	// Get comment and push to the database
+	// Only if the comment is from a recognized player
+	if (game.player.num > 0) {
+		const chatComment = $("#chatInput").val().trim();
+		if(chatComment.length > 0){
+			$("#chatInput").val('');
+			database.ref("chat").push({
+				playerNum: game.player.num,
+				playerName: game.player.name,
+				comment: chatComment,
+				commentTime: firebase.database.ServerValue.TIMESTAMP
+			});
+		}		
 	}
 });
 
-$(".reset").on('click', function(event) {
-	event.preventDefault();
-	database.ref().remove();
-	$("#chatHistory").empty();
-	// game.displayJoinForm("show");
-	// game.displayPlayerTurn("hide");
+database.ref("chat").orderByChild("commentDate").limitToLast(10).on('child_added', function(childSnapshot) {
+	const comment = $("<div class='comment player-"+ childSnapshot.val().playerNum +"'>");
+	const commentText = $("<p class='commentText'>")
+		.html("<span class='playerName'>"+childSnapshot.val().playerName + ":</span> " + childSnapshot.val().comment);
+
+	const commentTime = $("<div class='commentTime'>")
+		.text(moment(childSnapshot.val().commentTime).format("h:mm a"));
+
+	comment.append(commentText,commentTime);
+
+	$("#chatHistory").append(comment);
+
+	// Play sound
+	if(game.hasStarted && childSnapshot.val().playerNum === 1){
+		game.p1_comment_sound.play();
+	}else if(game.hasStarted && childSnapshot.val().playerNum === 2){
+		game.p2_comment_sound.play();
+	}
+
+	const chat = $("#chatHistory");
+	chat.animate({ scrollTop: chat.prop("scrollHeight")}, 1000);
+
+	// Remove the top most comment;
+	if($("#chatHistory div").children().length > 10){
+		$("#chatHistory div").eq(0).remove();
+	}
+});
+
+// ==============================
+// ===== Detect Connections =====
+// ==============================
+var connectionsRef = database.ref("/connections");
+var connectedRef = database.ref(".info/connected");
+
+connectedRef.on('value', function(snap) {
+	if(snap.val()){
+		var con = connectionsRef.push("connected");
+		con.onDisconnect().remove();
+	}
+});
+
+// Change in the number of connections +/-
+connectionsRef.on('value', function(snap) {
+	$(".visitors").text(snap.numChildren() + " visitors");
 });

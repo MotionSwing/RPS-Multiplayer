@@ -70,6 +70,9 @@ $("#chatSendBtn").on('click', function(event) {
 				comment: chatComment,
 				commentTime: firebase.database.ServerValue.TIMESTAMP
 			});
+
+			// const chat = $("#chatHistory");
+			// chat.scrollTop(chat.prop("scrollHeight"));
 		}		
 	}
 });
@@ -86,6 +89,18 @@ database.ref("chat").orderByChild("commentDate").limitToLast(10).on('child_added
 	comment.append(commentText,commentTime);
 
 	$("#chatHistory").append(comment);
+	const chat = $("#chatHistory");
+	chat.scrollTop(chat.prop("scrollHeight"));
+
+	// Remove the top most comment;
+	if($("#chatHistory div").children().length > 10){
+		$("#chatHistory div").eq(0).remove();
+	}
+});
+
+database.ref("chat").on('child_removed', function(event) {
+	$("#chatHistory").empty();
+	console.log("this event is firing this many times");
 });
 
 
@@ -129,6 +144,7 @@ firebase.auth().onAuthStateChanged(function(user) {
 				});
 				updateNameTags();
 			}
+			$("#inputName").val('');
 		});
 
 		// --------------------
@@ -161,27 +177,20 @@ firebase.auth().onAuthStateChanged(function(user) {
 				database.ref().update({
 					turn: game.turn
 				});
-				resetGame(snapshot);
 			}else if(!snapshot.child("players/1").exists() || !snapshot.child("players/2").exists()){
 				// If a player doesn't exist, reset the turn to 0
 				game.turn = 0;
 				database.ref().update({
 					turn: game.turn
 				});
-			}else {
-				// If only 1 player is present, remove player highlighting
-				highlightPlayer(0);
 			}
 
-			// // Check if both player 1 & player 2 exist
-			// if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.turn < 3){
-			// 	// updateTurnStatus("show",player.num, game.turn,
-			// 	// 	snapshot.child("players/" + game.turn).val().name);
-			// 	// highlightPlayer(game.turn);
-			// 	resetGame(snapshot);
-			// }else {
-			// 	highlightPlayer(0);
-			// }
+			// Check if both player 1 & player 2 exist
+			if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.turn < 3){
+				readyPlayer(snapshot);
+			}else {
+				highlightPlayer(0);
+			}
 
 			// Check who won the game
 			if(snapshot.child("turn").val() === 3 && 
@@ -246,7 +255,13 @@ firebase.auth().onAuthStateChanged(function(user) {
 			}
 		
 		});	
-		// End database.ref().on()
+		// End database.ref().on('value')
+		
+		database.ref().on('child_removed', function(snapshot) {
+			console.log('a child has been removed');
+			displayJoinForm("show");
+			displayPlayerTurn("hide");
+		});
 
 		// -------------------------------
 		// Console each player's choice
@@ -299,7 +314,7 @@ function updateNameTags() {
 // Hide/Show name input form
 function displayJoinForm(display){
 	if(display === "show"){
-		$("#joinForm").css('display', 'block');
+		$("#joinForm").css('display', 'flex');
 	}else if(display === "hide"){
 		$("#joinForm").css('display', 'none');
 	}
@@ -315,6 +330,16 @@ function displayPlayerTurn(display, playerNum, playerName){
 	}
 };
 
+// function displayOptions(display, playerNum){
+// 	if(display === "show"){
+// 		$("#p"+ playerNum +"-info").removeClass('hide');
+// 		$(".rock, .paper, .scissors").removeClass('hide');
+// 	}else {
+// 		$("#p"+ activePlayerNum +"-info").addClass('hide');
+// 		$(".rock, .paper, .scissors").addClass('hide');
+// 	}
+// }
+
 // * update the 'status' to notify the user if it is their turn or 
 //   if they are waiting for the other player to move
 function updateTurnStatus(display, playerNum, activePlayerNum, activePlayerName){
@@ -324,9 +349,12 @@ function updateTurnStatus(display, playerNum, activePlayerNum, activePlayerName)
 		if(playerNum === activePlayerNum) {
 			$("#turnStatus p").text("It's Your Turn!");
 			$("#p"+ playerNum +"-info").removeClass('hide');
+			$(".rock, .paper, .scissors").show();
 		}else{
 			$("#turnStatus p").text("Waiting for " + activePlayerName + " to choose.");
+			$("#p"+ playerNum +"-info").addClass('hide');
 			$("#p"+ activePlayerNum +"-info").addClass('hide');
+			$(".rock, .paper, .scissors").hide();
 		}
 
 	}else if (display === "hide"){
@@ -336,8 +364,8 @@ function updateTurnStatus(display, playerNum, activePlayerNum, activePlayerName)
 
 // Highlight the selected player
 function highlightPlayer(playerNum){
-	$(".player").removeClass('bg-info')
-	$("#player-" + playerNum).addClass('bg-info');
+	$(".player").removeClass('bg-warning')
+	$("#player-" + playerNum).addClass('bg-warning');
 };
 
 // Update database to reflect player's choice for this round
@@ -379,10 +407,15 @@ function displayWinner(snap, winner,loser){
 function resetGame(snap){
 	game.hasSelectedChoice = false;
 	$("#results").text('');
-	updateTurnStatus("show",player.num,game.turn,snap.child("players/" + game.turn).val().name);
-	highlightPlayer(game.turn);
+	// $(".rock, .paper, .scissors").show();
+	readyPlayer(snap);
 
 	console.log('game has been reset');
+}
+
+function readyPlayer(snap){
+	updateTurnStatus("show",player.num,game.turn,snap.child("players/" + game.turn).val().name);
+	highlightPlayer(game.turn);
 }
 
 // ============================
@@ -410,6 +443,13 @@ $(".card-body").on('click', ".rock", function(event) {
 		updatePlayerChoice("Scissors");
 		$(".rock, .paper").hide();	
 	}
+});
+
+$(".reset").on('click', function(event) {
+	event.preventDefault();
+	database.ref().remove();
+	displayJoinForm("show");
+	displayPlayerTurn("hide");
 });
 
 // ------------

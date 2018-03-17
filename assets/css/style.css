@@ -64,3 +64,18 @@
 .playerName {
     font-weight: 600;
 }
+
+/*------*/
+/* Reset */
+/*------*/
+.reset {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+}
+
+/* Options */
+#p1-info,
+#p2-info {
+    min-height: 78px;
+}

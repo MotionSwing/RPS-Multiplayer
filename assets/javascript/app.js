@@ -1,4 +1,6 @@
-// Initialize Firebase
+// =============================
+// ==== Initialize Firebase ====
+// =============================
 var config = {
 	apiKey: "AIzaSyDJF2XlesilxEfKHgF_1I3CL7MZbcaAjYo",
 	authDomain: "rps-game-6259d.firebaseapp.com",
@@ -11,176 +13,54 @@ firebase.initializeApp(config);
 
 var database = firebase.database();
 
-// Detect when users come and go
-var connectionsRef = database.ref("/connections");
-var connectedRef = database.ref(".info/connected");
+// ============================
+// ===== Global Variables =====
+// ============================
 
-connectedRef.on('value', function(snap) {
-	if(snap.val()){
-		var con = connectionsRef.push("connected");
+var playerOneExists = false;
+var playerTwoExists = false;
+var playerTwoHasChosen = false;
 
-		con.onDisconnect().remove();
-		// con.onDisconnect().set("disconnected");
-	}
-});
+// ------------
+// Game Object
+// ------------
+var game = {
+    turn: 0,
+    hasStarted: false,
+    hasSelectedChoice: false,
+    roundFinished: false,
+    roundReset: 3000,
+    p1_comment_sound: new Audio('assets/audio/button-09.mp3'),
+    p2_comment_sound: new Audio('assets/audio/button-11.mp3'),
+    player: {
+    	num: 0,
+    	name: "",
+    	choice: ""
+    },
 
-// Change in the number of connections +/-
-connectionsRef.on('value', function(snap) {
-	console.log(snap.numChildren());
-});
+	// Update database to reflect player's choice for this round
+    updatePlayerChoice: function(selectedOption){
+    	(game.turn === 1) ? game.turn = 2 : game.turn = 3;
 
-// ==============================
-// ======= CHAT =================
-// ==============================
-$("#chatSendBtn").on('click', function(event) {
-	event.preventDefault();
+		game.hasSelectedChoice = true;
 
-	// Get comment and push to the database
-	const chatComment = $("#chatInput").val().trim();
-	if(chatComment.length > 0){
-		$("#chatInput").val('');
-		database.ref("chat").push({
-			player: player.name,
-			comment: chatComment,
-			commentTime: firebase.database.ServerValue.TIMESTAMP
+		game.player.choice = selectedOption;
+
+		database.ref().update({
+			turn: game.turn
 		});
-	}
-});
+		database.ref("players/" + game.player.num).update({
+			choice: selectedOption
+		});
+		// (game.turn === 1) ? game.turn = 2 : game.turn = 3;
+    },
 
-database.ref("chat").orderByChild("commentDate").limitToLast(10).on('child_added', function(childSnapshot) {
-	console.log('chat add comment');
-	const comment = $("<div class='comment'>");
-	const commentText = $("<p class='commentText'>")
-		.text(childSnapshot.val().player + ": " + childSnapshot.val().comment);
-
-	const commentTime = $("<div class='commentTime'>")
-		.text(moment(childSnapshot.val().commentTime).format("h:mm a"));
-
-	comment.append(commentText,commentTime);
-
-	$("#chatHistory").append(comment);
-});
-
-// setup player object
-// This holds the current user's info
-var player = {
-	num: 0,
-	name: "",
-	wins: 0,
-	losses: 0,
-	choice: ""
-};
-
-// Global variables
-var playerOneIsChosen = false;
-var playerTwoIsChosen = false;
-var playerOne;
-var playerTwo;
-var currentTurn = 0;
-
-// Sign in users anonymously
-firebase.auth().signInAnonymously().catch(function(error) {
-	// Handle Errors here.
-	var errorCode = error.code;
-	var errorMessage = error.message;
- 	console.log("Error: " + errorCode + " | " + errorMessage);
-});
-
-firebase.auth().onAuthStateChanged(function(user) {
-  if (user) {
-    // User is signed in.
-    var isAnonymous = user.isAnonymous;
-    var uid = user.uid;
-    console.log(uid);
-
-	// initial load and subsequent value changes
-	database.ref().on('value', function(snapshot) {
-
-		// Display Player 1 name if the player has been chosen
-		if(snapshot.child("players/1").exists()){
-			playerOneIsChosen = true;
-			playerOne = snapshot.child("players/1").val().name;
-			const name = snapshot.child("players/1").val().name;
-			const losses = snapshot.child("players/1").val().losses;
-			const wins = snapshot.child("players/1").val().wins;
-			$(".player-1 .player-name").text(name);
-			$(".player-1 .wins-losses").text("Wins " + wins + " Losses " + losses);
-		}else {
-			$(".player-1 .player-name").text("Waiting for Player 1");
-			playerOneIsChosen = false;
-		}
-
-		// Display Player 2 name if the player has been chosen
-		if(snapshot.child("players/2").exists()){
-			playerTwoIsChosen = true;
-			playerTwo = snapshot.child("players/2").val().name;
-			const name = snapshot.child("players/2").val().name;
-			const losses = snapshot.child("players/2").val().losses;
-			const wins = snapshot.child("players/2").val().wins;
-			$(".player-2 .player-name").text(name);
-			$(".player-2 .wins-losses").text("Wins " + wins + " Losses " + losses);
-			$("#p"+ player.num +"-info").removeClass('hide');
-
-		}else {
-			$(".player-2 .player-name").text("Waiting for Player 2");
-			playerTwoIsChosen = false;
-		}
-
-		// get the current turn
-		if(snapshot.child("players/turn").exists()){
-			currentTurn = snapshot.child("players").val().turn;
-
-			if(currentTurn > 0){
-				$("#playerAndStatusInfo").empty();
-				displayWhosTurn(currentTurn);
-			}
-		}
-
-		// Check for the winner
-		if(snapshot.child("players/1/choice").exists() 
-			&& snapshot.child("players/2/choice").exists() && currentTurn === 3){
-			// Get Player 1 info
-			console.log("performing check");
-			const p1_choice = snapshot.child("players/1").val().choice;
-			let p1_wins = snapshot.child("players/1").val().wins;
-			let p1_losses = snapshot.child("players/1").val().losses;
-			// Get Player 2 info
-			const p2_choice = snapshot.child("players/2").val().choice;
-			let p2_wins = snapshot.child("players/2").val().wins;
-			let p2_losses = snapshot.child("players/2").val().losses;
-
-			// Reset the turn back to 1
-			database.ref("players").update({
-				turn: 1
-			});
-
-			if (p1_choice === "Rock" && p2_choice === "Scissors"){
-				displayWinner(1,2);
-			}else if (p1_choice === "Paper" && p2_choice === "Rock"){
-				displayWinner(1,2);
-			}else if (p1_choice === "Scissors" && p2_choice === "Paper") {
-				displayWinner(1,2);
-			}else if (p2_choice === "Rock" && p1_choice === "Scissors") {
-				displayWinner(2,1);
-			}else if (p2_choice === "Paper" && p1_choice === "Rock") {
-				displayWinner(2,1);
-			}else if (p2_choice === "Scissors" && p1_choice === "Paper"){
-				displayWinner(2,1);
-			}else {
-				// if a tie
-				console.log('Tie Game');
-			}
-
-			// After timeout, display options
-			setTimeout(function(){
-				$(".rock, .paper, .scissors").show();
-				$("#winner").text('');
-			},2000);
-		}
-
-		function displayWinner(winner,loser){
-			var winner_wins = snapshot.child("players/" + winner).val().wins;
-			var loser_losses = snapshot.child("players/" + loser).val().losses;
+    // Increment wins/losses and update the DOM with the winner
+    displayWinner: function(snap, winner,loser){
+    	if(!(winner === 0) && !(loser === 0)){
+			console.log('Check Winner: Player '+ winner +' wins!');
+			let winner_wins = snap.child("players/" + winner).val().wins;
+			let loser_losses = snap.child("players/" + loser).val().losses;
 			winner_wins++;
 			loser_losses++;
 			database.ref("players/" + winner).update({
@@ -190,153 +70,396 @@ firebase.auth().onAuthStateChanged(function(user) {
 				losses: loser_losses
 			});
 
-			$("#winner").text(snapshot.child("players/" + winner).val().name + " Wins!!");
-		};
-	});
-
-	// // ==============================
-	// // ======= CHAT =================
-	// // ==============================
-	// $("#chatSendBtn").on('click', function(event) {
-	// 	event.preventDefault();
-
-	// 	// Get comment and push to the database
-	// 	const chatComment = $("#chatInput").val().trim();
-	// 	if(chatComment.length > 0){
-	// 		$("#chatInput").val('');
-	// 		database.ref("chat").push({
-	// 			player: player.name,
-	// 			comment: chatComment,
-	// 			commentTime: firebase.database.ServerValue.TIMESTAMP
-	// 		});
-	// 	}
-	// });
-
-	// database.ref("chat").orderByChild("commentDate").limitToLast(10).on('child_added', function(childSnapshot) {
-	// 	console.log('chat add comment');
-	// 	const comment = $("<div class='comment'>");
-	// 	const commentText = $("<p class='commentText'>")
-	// 		.text(childSnapshot.val().player + ": " + childSnapshot.val().comment);
-
-	// 	const commentTime = $("<div class='commentTime'>")
-	// 		.text(moment(childSnapshot.val().commentTime).format("h:mm a"));
-
-	// 	comment.append(commentText,commentTime);
-
-	// 	$("#chatHistory").append(comment);
-	// });
-
-	// Set the name(s) of the players
-	$("#submitName").on('click', function(event) {
-		event.preventDefault();
-		$("#chatHistory").empty();
-		if(!playerOneIsChosen){
-			player.name = $("#inputName").val().trim();
-			player.num = 1;
-			database.ref("players/1").set({
-				losses: 0,
-				name: player.name,
-				wins: 0
-			});
-			showStatusInfo(1);
-		}else if (!playerTwoIsChosen){
-			player.name = $("#inputName").val().trim();
-			player.num = 2;
-			database.ref("players/2").set({
-				losses: 0,
-				name: player.name,
-				wins: 0
-			});
-			database.ref("players").update({
-				turn: 1
-			});
-			showStatusInfo(2);
+			$("#results").text(snap.child("players/" + winner).val().name + " Wins!!");		
+		}else{
+			console.log('Check Winner: Tie Game');
+			$("#results").text("Tie Game!");	
 		}
-	});
+    },
 
-	// Update the player's choice in the DB
-	$(".card-body").on('click', ".rock", function(event) {
-		event.preventDefault();
-		updatePlayerChoice("Rock");
-		$(".paper, .scissors").hide();
-	}).on('click', '.paper', function(event) {
-		event.preventDefault();
-		updatePlayerChoice("Paper");
-		$(".rock, .scissors").hide();
-	}).on('click', '.scissors', function(event) {
-		event.preventDefault();
-		updatePlayerChoice("Scissors");
-		$(".rock, .paper").hide();
-	});
-
-
-
-	function updatePlayerChoice(selectedOption){
-		currentTurn++;
-		database.ref("players").update({
-			turn: currentTurn
+    // Resets the game
+    resetGame: function(snap){
+    	game.hasSelectedChoice = false;
+		$("#results").text('');
+		game.roundFinished = false;
+		playerTwoHasChosen = false;
+		database.ref().update({
+			turn: 1
 		});
-		database.ref("players/" + player.num).update({
-			choice: selectedOption
-		});
+		$("#player-1 .btn, #player-2 .btn").removeClass('active').show();
+		$("#p2-info").addClass('hide');
+		console.log('game has been reset');
+		$(".player").removeClass('bg-warning');
+		$("#player-1").addClass('bg-warning');
+    }
+}
+
+// ===========================
+// ===== Event Handlers ======
+// ===========================
+
+$(".player .btn").on('click', function(event) {
+	event.preventDefault();
+	if(!game.hasSelectedChoice){
+		var choice = $(this).attr('data-value');
+		$("#player-"+ game.player.num +" .btn").removeClass('active');
+		$(this).addClass('active');
+
+		// // Create image
+		// var img = $("<img>").attr({
+		// 	'src': 'assets/images/' + $(this).attr('data-value') + '.png',
+		// 	'alt': $(this).attr('data-value'),
+		// 	'height': 150
+		// });
+
+		// $(this).empty().append(img);
+
+		game.updatePlayerChoice(choice);
 	}
-
-  } else {
-    // User is signed out.
-    // ...
-    console.log('user sign out');
-  }
 });
 
-function showNameInput(){
-	var name_form = $("<form class='form-inline'>")
-	var name_textbox = $("<input>");
-	name_textbox.attr({
-		type: "text",
-		class: "form-control",
-		id: "inputName",
-		placeholder: "Name"
-	});
-	var name_wrapper = $("<div class='form-group mx-sm-3 mb-2'>");
-	name_wrapper.append(name_textbox);
-	var name_btn = $("<button>").text("Start");
-		name_btn.attr({
-			id: "submitName",
-			type: "submit",
-			class: "btn btn-primary mb-2"
+$(".reset").on('click', function(event) {
+	event.preventDefault();
+	database.ref().remove();
+	$("#chatHistory").empty();
+});
+
+// ================================
+// ===== User Authentication ======
+// ================================
+		
+// Log the user in anonymously
+firebase.auth().signInAnonymously();
+
+// Only update the database if the user is logged in
+firebase.auth().onAuthStateChanged(function(user) {
+	if (user) {
+		// User is signed in.
+		var isAnonymous = user.isAnonymous;
+		var uid = user.uid;
+
+		// --------------------
+		// Update Player's Name
+		// --------------------
+		$("#submitName").on('click', function(event) {
+			event.preventDefault();
+			// Send name to DB
+			const username = $("#inputName").val().trim();
+			game.player.name = username;
+
+			if(!playerOneExists){
+				game.player.num = 1;
+				database.ref("players/1").set({
+					losses: 0,
+					name: username,
+					wins: 0
+				});
+				// hide form and display other things
+				$("#joinForm").css('display', 'none');
+				$("#playerInfo").text("Hi " + username + "! You are Player " + game.player.num);
+				game.hasStarted = true;
+			}else if(playerOneExists && !playerTwoExists){
+				game.player.num = 2;
+				database.ref("players/2").set({
+					losses: 0,
+					name: username,
+					wins: 0
+				});
+
+				$("#joinForm").css('display', 'none');
+				$("#playerInfo").text("Hi " + username + "! You are Player " + game.player.num);
+				game.hasStarted = true;
+			}
+			$("#inputName").val('');
 		});
-	name_form.append(name_wrapper, name_btn);
-	$("#playerAndStatusInfo").empty().append(name_form);
-	$("#playerAndStatusInfo").removeClass().addClass('row justify-content-md-center');
-};
 
-function showStatusInfo(playerNum){
-	$("#playerAndStatusInfo").removeClass().addClass('d-flex flex-column');
-	if(playerNum === 1){
-		var playerInfo = $("<p class='mx-auto'>").text("Hi " + player.name + "! You are Player 1");
-		$("#playerAndStatusInfo").empty().append(playerInfo);
-	}else if(playerNum === 2){
-		var playerInfo = $("<p class='mx-auto'>").text("Hi " + player.name + "! You are Player 2");
-		$("#playerAndStatusInfo").empty().append(playerInfo);
-	}
-};
+		// --------------------
+		// Listen for All Database Updates
+		// --------------------
+		database.ref().on('value', function(snapshot) {
+			const username = $("#inputName").val().trim();
 
-function displayWhosTurn(turnNum) {
-	var turnStatus = $("<p class='mx-auto'>");
-	$("#playerAndStatusInfo p:gt(0)").remove();
-	if(turnNum === 1){
-		if(player.num === 1){
-			turnStatus.text("It's Your Turn!");
-		}else if(player.num === 2)  {
-			turnStatus.text("Waiting on " + playerOne + " to choose");
-		}
-		$("#playerAndStatusInfo").append(turnStatus);
-	}else if(turnNum === 2){
-		if(player.num === 1){
-			turnStatus.text("Waiting on " + playerTwo + " to choose");
-		}else if(player.num === 2) {
-			turnStatus.text("It's Your Turn!");
-		}
-		$("#playerAndStatusInfo").append(turnStatus);
+			// Update DOM if player 1 exists
+			if(snapshot.child("players/1").exists()){
+				playerOneExists = true;
+				$("#player-1 .player-name").text(snapshot.child("players/1").val().name);
+			}else {
+				playerOneExists = false;
+				$("#player-1 .player-name").text("Waiting for Player 1");
+			}
+
+			// Update DOM if player 2 exists
+			if(snapshot.child("players/2").exists()){
+				playerTwoExists = true;
+				$("#player-2 .player-name").text(snapshot.child("players/2").val().name);
+			}else {
+				playerTwoExists = false;
+				$("#player-2 .player-name").text("Waiting for Player 2");
+			}
+
+			// Start the game when both players exist
+			if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.turn === 0){
+				game.turn++;
+				database.ref().update({
+					turn: game.turn
+				});
+				// Display Turn Info
+				if(game.player.num === game.turn) {
+					$("#turnInfo").text("It's Your Turn!");
+				}else{
+					$("#turnInfo").text("Waiting for " + snapshot.child("players/1").val().name + " to choose.");
+				}
+			}else if(!snapshot.child("players/1").exists() || !snapshot.child("players/2").exists()){
+				// If a player doesn't exist, reset the turn to 0
+				game.turn = 0;
+				database.ref().update({
+					turn: game.turn
+				});
+				$("#turnInfo").text('');
+				$("#p1-info").addClass('hide');
+				$("#p2-info").addClass('hide');	
+			}
+
+			// Player 1's turn
+			if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.turn === 1){
+				if(game.player.num === game.turn){
+					$("#turnInfo").text("It's Your Turn!");
+					$(".player").removeClass('bg-warning');
+					$("#player-" + game.turn).addClass('bg-warning');
+					$("#player-1 .btn").show();
+					$("#p1-info").removeClass('hide');
+					$("#p2-info").addClass('hide');	
+				}else {
+					$("#turnInfo").text("Waiting for " + snapshot.child("players/1").val().name + " to choose.");
+					$(".player").removeClass('bg-warning');
+					$("#player-" + game.turn).addClass('bg-warning');
+					$("#p1-info").addClass('hide');
+					$("#p2-info").addClass('hide');	
+				}
+			}
+
+			// Player 2's turn
+			if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.turn === 2){
+				if(game.player.num === game.turn) {
+					$("#turnInfo").text("It's Your Turn!");
+					$(".player").removeClass('bg-warning');
+					$("#player-" + game.turn).addClass('bg-warning');
+					$("#player-2 .btn").show();
+					$("#p1-info").addClass('hide');
+					$("#player-1 .btn[data-value="+ snapshot.child("players/1").val().choice +"]").addClass('active');
+					$("#p2-info").removeClass('hide');
+				}else {
+					$("#turnInfo").text("Waiting for " + snapshot.child("players/2").val().name + " to choose.");
+					$(".player").removeClass('bg-warning');
+					$("#player-" + game.turn).addClass('bg-warning');
+					$("#p1-info").removeClass('hide');
+
+					var choice = $("#player-1 .btn.active").attr('data-value');
+					$("#player-1 .btn:not(."+ choice +")").hide();
+
+					// // Create image
+					// var img = $("<img>").attr({
+					// 	'src': 'assets/images/' + $("#player-1 .btn.active").attr('data-value') + '.png',
+					// 	'alt': $(this).attr('data-value'),
+					// 	'height': 100
+					// });
+
+					// $("#player-1 .btn.active").empty().append(img);
+
+					$("#p2-info").addClass('hide');
+				}
+			}
+
+			// Results Reveal
+			if(snapshot.child("players/1").exists() && snapshot.child("players/2").exists() && game.roundFinished){
+				$("#p1-info").removeClass('hide');
+				$("#p2-info").removeClass('hide');	
+
+				var p1_choice = $("#player-1 .btn.active").attr('data-value');
+				$("#player-1 .btn:not(."+ p1_choice +")").hide();
+
+				var p2_choice = $("#player-2 .btn.active").attr('data-value');
+				$("#player-2 .btn:not(."+ p2_choice +")").hide();
+			}
+
+			// Check to see who won the game
+			if(snapshot.child("turn").val() === 3 && game.roundFinished === false && 
+				snapshot.child("players/1/choice").exists() && 
+				snapshot.child("players/2/choice").exists()){
+
+				game.roundFinished = true;
+
+				console.log("Check Winner: obtain player choices");
+				var p1_choice = snapshot.child("players/1/choice").val();
+				var p2_choice = snapshot.child("players/2/choice").val();
+				var winner = 0;
+				var loser = 0;
+
+				console.log("Check Winner: compare choices and determine winner");
+				console.log("P1 Choice: " + p1_choice + ", P2 Choice: " + p2_choice);
+				if (p1_choice === "rock" && p2_choice === "scissors"){
+					winner = 1;
+					loser = 2;
+				}else if (p1_choice === "rock" && p2_choice === "paper") {
+					winner = 2;
+					loser = 1;
+				}else if (p1_choice === "rock" && p2_choice === "rock") {
+					winner = 0;
+					loser = 0;
+				}else if (p1_choice === "paper" && p2_choice === "rock"){
+					winner = 1;
+					loser = 2;
+				}else if (p1_choice === "paper" && p2_choice === "scissors"){
+					winner = 2;
+					loser = 1;
+				}else if (p1_choice === "paper" && p2_choice === "paper"){
+					winner = 0;
+					loser = 0;
+				}else if (p1_choice === "scissors" && p2_choice === "paper") {
+					winner = 1;
+					loser = 2;
+				}else if (p1_choice === "scissors" && p2_choice === "rock") {
+					winner = 2;
+					loser = 1;
+				}else if (p1_choice === "scissors" && p2_choice === "scissors") {
+					winner = 0;
+					loser = 0;
+				}
+				game.displayWinner(snapshot,winner,loser);
+
+				console.log("Check Winner: reset after timeout");
+				setTimeout(function(){
+					game.resetGame(snapshot);
+				}, game.roundReset);
+			}
+
+			// Ensure client-side turn property is in sync with DB
+			if(snapshot.child("turn").exists()){
+				database.ref("turn").on('value', function(snapshot) {
+					game.turn = snapshot.val();
+				});
+			}
+
+			// Ensure client-side Player 1 name is in sync with DB
+			if(snapshot.child("players/1/name").exists()){
+				database.ref("turn").on('value', function(snapshot) {
+					var username = snapshot.val();
+					game.player.name = username;
+				});
+			}
+
+			// Ensure client-side Player 2 name is in sync with DB
+			if(snapshot.child("players/2/name").exists()){
+				database.ref("turn").on('value', function(snapshot) {
+					var username = snapshot.val();
+					game.player.name = username;
+				});
+			}
+		
+		});	
+		// End of database.ref().on('value')
+
+		// -------------------------------
+		// Console each player's choice
+		// -------------------------------
+		database.ref("players/1/choice").on('value', function(snap) {
+			if(snap.exists()){
+				console.log('P1 Choice: ' + snap.val());
+			}
+		});
+
+		database.ref("players/2/choice").on('value', function(snap) {
+			if(snap.exists()){
+				console.log('P2 Choice: ' + snap.val());
+			}
+		});
+
+		// -------------------------------
+		// Update Wins / Losses in the DOM
+		// -------------------------------
+		database.ref("players/1/wins").on('value', function(snapshot) {
+			$("#player-1 .wins").text(snapshot.val() || 0);
+		});
+
+		database.ref("players/1/losses").on('value', function(snapshot) {
+			$("#player-1 .losses").text(snapshot.val() || 0);
+		});
+
+		database.ref("players/2/wins").on('value', function(snapshot) {
+			$("#player-2 .wins").text(snapshot.val() || 0);
+		});
+
+		database.ref("players/2/losses").on('value', function(snapshot) {
+			$("#player-2 .losses").text(snapshot.val() || 0);
+		});
+		
 	}
-};
+});
+
+// ============================
+// ======= Player Chat ========
+// ============================
+$("#chatSendBtn").on('click', function(event) {
+	event.preventDefault();
+
+	// Get comment and push to the database
+	// Only if the comment is from a recognized player
+	if (game.player.num > 0) {
+		const chatComment = $("#chatInput").val().trim();
+		if(chatComment.length > 0){
+			$("#chatInput").val('');
+			database.ref("chat").push({
+				playerNum: game.player.num,
+				playerName: game.player.name,
+				comment: chatComment,
+				commentTime: firebase.database.ServerValue.TIMESTAMP
+			});
+		}		
+	}
+});
+
+database.ref("chat").orderByChild("commentDate").limitToLast(10).on('child_added', function(childSnapshot) {
+	const comment = $("<div class='comment player-"+ childSnapshot.val().playerNum +"'>");
+	const commentText = $("<p class='commentText'>")
+		.html("<span class='playerName'>"+childSnapshot.val().playerName + ":</span> " + childSnapshot.val().comment);
+
+	const commentTime = $("<div class='commentTime'>")
+		.text(moment(childSnapshot.val().commentTime).format("h:mm a"));
+
+	comment.append(commentText,commentTime);
+
+	$("#chatHistory").append(comment);
+
+	// Play sound
+	if(game.hasStarted && childSnapshot.val().playerNum === 1){
+		game.p1_comment_sound.play();
+	}else if(game.hasStarted && childSnapshot.val().playerNum === 2){
+		game.p2_comment_sound.play();
+	}
+
+	const chat = $("#chatHistory");
+	chat.animate({ scrollTop: chat.prop("scrollHeight")}, 1000);
+
+	// Remove the top most comment;
+	if($("#chatHistory div").children().length > 10){
+		$("#chatHistory div").eq(0).remove();
+	}
+});
+
+// ==============================
+// ===== Detect Connections =====
+// ==============================
+var connectionsRef = database.ref("/connections");
+var connectedRef = database.ref(".info/connected");
+
+connectedRef.on('value', function(snap) {
+	if(snap.val()){
+		var con = connectionsRef.push("connected");
+		con.onDisconnect().remove();
+	}
+});
+
+// Change in the number of connections +/-
+connectionsRef.on('value', function(snap) {
+	$(".visitors").text(snap.numChildren() + " visitors");
+});

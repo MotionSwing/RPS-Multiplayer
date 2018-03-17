@@ -7,8 +7,8 @@
 	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
 	<link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body>
-	<div class="container">
+<body class="bg-dark">
+	<div class="container bg-dark">
 
 		<!-- Jumbotron -->
 		<div class="jumbotron text-center">
@@ -27,7 +27,7 @@
 			</form>	
 
 			<!-- Player Info & Turn Status -->
-			<div id="playerTurn">
+			<div id="playerTurn" class="text-white">
 				<div id="playerInfo">
 					<p class='text-center'>Hi [Player Name]! You are Player [Player Num]</p>
 				</div>
@@ -45,9 +45,11 @@
 			  	<h5 class="card-title player-name text-center">Waiting for Player 1</h5>
 			  </div>
 			  <div id="p1-info" class="card-body text-center hide">
-			    <div class="btn btn-primary rock">Rock</div>
-			    <div class="btn btn-primary paper">Paper</div>
-			    <div class="btn btn-primary scissors">Scissors</div>
+			    <div class="btn btn-outline-dark rock">Rock</div>
+			    <div class="btn btn-outline-dark paper">Paper</div>
+			    <div class="btn btn-outline-dark scissors">Scissors</div>
+			  </div>
+			  <div id="wins-losses">
 			    <p class="card-text text-center">Wins <span class="wins">0</span> Losses <span class="losses">0</span></p>
 			  </div>
 			</div>
@@ -61,9 +63,11 @@
 			  	<h5 class="card-title player-name text-center">Waiting for Player 2</h5>
 			  </div>
 			  <div id="p2-info" class="card-body text-center hide">
-			    <div class="btn btn-primary rock">Rock</div>
-			    <div class="btn btn-primary paper">Paper</div>
-			    <div class="btn btn-primary scissors">Scissors</div>
+			    <div class="btn btn-outline-dark rock">Rock</div>
+			    <div class="btn btn-outline-dark paper">Paper</div>
+			    <div class="btn btn-outline-dark scissors">Scissors</div>
+			  </div>
+			  <div id="wins-losses">
 			    <p class="card-text text-center">Wins <span class="wins">0</span> Losses <span class="losses">0</span></p>
 			  </div>
 			</div>		

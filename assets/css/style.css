@@ -2,20 +2,15 @@
 	visibility: hidden;
 }
 
+/*------------------*/
 /* Custom Bootstrap */
-
+/*------------------*/
 .jumbotron {
 	padding: .25rem;
 }
 
 .border-warning {
     border-width: 2px !important;
-}
-
-/* Extra */
-
-#playerAndStatusInfo p {
-	display: block;
 }
 
 /*------*/

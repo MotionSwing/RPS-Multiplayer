@@ -83,7 +83,7 @@ var game = {
 		database.ref().update({
 			turn: 1
 		});
-		$("#player-1 .btn, #player-2 .btn").removeClass('active').show();
+		$("#player-1 .btn, #player-2 .btn").removeClass('active').empty().show();
 		$("#p2-info").addClass('hide');
 		console.log('game has been reset');
 		$(".player").removeClass('bg-warning');
@@ -99,8 +99,18 @@ $(".player .btn").on('click', function(event) {
 	event.preventDefault();
 	if(!game.hasSelectedChoice){
 		var choice = $(this).attr('data-value');
-		$("#player-"+ game.player.num +" .btn").removeClass('active');
+		$("#player-"+ game.player.num +" .btn").removeClass('active').empty();
 		$(this).addClass('active');
+
+		// Create image
+		var img = $("<img>").attr({
+			'src': 'assets/images/' + $(this).attr('data-value') + '.png',
+			'alt': $(this).attr('data-value'),
+			'height': 150
+		});
+
+		$(this).append(img);
+
 		game.updatePlayerChoice(choice);
 	}
 });

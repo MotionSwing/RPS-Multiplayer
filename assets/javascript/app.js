@@ -9,6 +9,7 @@ var config = {
 	storageBucket: "",
 	messagingSenderId: "621914515101"
 };
+
 firebase.initializeApp(config);
 
 var database = firebase.database();
@@ -40,6 +41,7 @@ var game = {
 
 	// Update database to reflect player's choice for this round
     updatePlayerChoice: function(selectedOption){
+    	console.log('updatePlayerChoice');
     	(game.turn === 1) ? game.turn = 2 : game.turn = 3;
 
 		game.hasSelectedChoice = true;
@@ -133,10 +135,29 @@ firebase.auth().signInAnonymously();
 
 // Only update the database if the user is logged in
 firebase.auth().onAuthStateChanged(function(user) {
+
 	if (user) {
 		// User is signed in.
 		var isAnonymous = user.isAnonymous;
 		var uid = user.uid;
+
+// ==============================
+// ===== Detect Connections =====
+// ==============================
+var connectionsRef = database.ref("/connections");
+var connectedRef = database.ref(".info/connected");
+
+connectedRef.on('value', function(snap) {
+	if(snap.val()){
+		var con = connectionsRef.push("connected");
+		con.onDisconnect().remove();
+	}
+});
+
+// Change in the number of connections +/-
+connectionsRef.on('value', function(snap) {
+	$(".visitors").text(snap.numChildren() + " visitors");
+});
 
 		// --------------------
 		// Update Player's Name
@@ -145,7 +166,9 @@ firebase.auth().onAuthStateChanged(function(user) {
 			event.preventDefault();
 			// Send name to DB
 			const username = $("#inputName").val().trim();
-			game.player.name = username;
+			console.log("submit snapshot: " + username);
+			game.player.name = username;  
+			console.log(game); //Incorrectly displays the player num and not the name
 
 			if(!playerOneExists){
 				game.player.num = 1;
@@ -344,6 +367,7 @@ firebase.auth().onAuthStateChanged(function(user) {
 			if(snapshot.child("players/1/name").exists()){
 				database.ref("turn").on('value', function(snapshot) {
 					var username = snapshot.val();
+					console.log("Player 1 snapshot: " + username);
 					game.player.name = username;
 				});
 			}
@@ -352,6 +376,7 @@ firebase.auth().onAuthStateChanged(function(user) {
 			if(snapshot.child("players/2/name").exists()){
 				database.ref("turn").on('value', function(snapshot) {
 					var username = snapshot.val();
+					console.log("Player 2 snapshot: " + username);
 					game.player.name = username;
 				});
 			}
@@ -446,20 +471,3 @@ database.ref("chat").orderByChild("commentDate").limitToLast(10).on('child_added
 	}
 });
 
-// ==============================
-// ===== Detect Connections =====
-// ==============================
-var connectionsRef = database.ref("/connections");
-var connectedRef = database.ref(".info/connected");
-
-connectedRef.on('value', function(snap) {
-	if(snap.val()){
-		var con = connectionsRef.push("connected");
-		con.onDisconnect().remove();
-	}
-});
-
-// Change in the number of connections +/-
-connectionsRef.on('value', function(snap) {
-	$(".visitors").text(snap.numChildren() + " visitors");
-});

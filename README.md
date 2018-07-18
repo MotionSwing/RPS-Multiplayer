@@ -9,9 +9,9 @@ Points to Remember:
 * Paper beats Rock
 * Scissors beats Paper
 
-[Click here to play!](https://motionswing.github.io/Gif-Generator/)
+[Click here to play!](https://jonathan-white.github.io/RPS-Multiplayer/)
 
 ## Author
 
 This project is maintained and written by 
-[Jon White](https://motionswing.github.io/)
+[Jon White](https://jonathan-white.github.io/)
